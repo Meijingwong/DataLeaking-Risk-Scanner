@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="Feature-Policy"
+        content="geolocation 'none'; midi 'none'; sync-xhr 'none'; microphone 'none'; camera 'none'; magnetometer 'none'; gyroscope 'none'; speaker 'none'; fullscreen 'self'; payment 'none';">
+    <title>Data Leaking Risk Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+</head>
+
+<body>
+    <section class="scan">
+        <h2>Data Leaking Risk Scanner</h2>
+        <input type="text" id="url" placeholder="Enter url">
+        <button type="submit" onclick="myfunction();">Scan URL</button>
+        <div id="result"></div>
+    </section>
+
+    <section class="first">
+        <div id="main" style="display: none;">
+            <div class="progress-and-table">
+                <div class="progress-bar">
+                    <div class="border">
+                        <div id="myBar" class="progress-value"></div>
+                    </div>
+
+                    <div class="progress-circle">
+                        <div class="circle-wrap">
+                            <div class="circle">
+                                <div class="mask full">
+                                    <div class="fill"></div>
+                                </div>
+                                <div class="mask half">
+                                    <div class="fill"></div>
+                                </div>
+                                <div class="inside-circle">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="risk"></div>
+                </div>
+                <div class="table-container">
+                    <div class="result-total-score">
+                        <table border="1">
+                            <tr>
+                                <td>80-99</td>
+                                <td>Low Risk</td>
+                            </tr>
+                            <tr>
+                                <td>60-79</td>
+                                <td>Medium Low Risk</td>
+                            </tr>
+                            <tr>
+                                <td>40-59</td>
+                                <td>Medium Risk</td>
+                            </tr>
+                            <tr>
+                                <td>20-39</td>
+                                <td>Medium High Risk</td>
+                            </tr>
+                            <tr>
+                                <td>0-19</td>
+                                <td>High Risk</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="check">
+                <div class="param">
+                    <div class="vulnerability-box" id="clickjack-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>Clickjack vulnerability</h2>
+                        <ul id="clickjack"></ul>
+                    </div>
+
+                    <div class="vulnerability-box" id="sql-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>SQL vulnerability</h2>
+                        <ul id="sql"></ul>
+                    </div>
+
+                    <div class="vulnerability-box" id="hostname-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>Hostname vulnerability</h2>
+                        <ul id="hostname"></ul>
+                    </div>
+
+                    <div class="vulnerability-box" id="scheme-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>Scheme vulnerability</h2>
+                        <ul id="scheme"></ul>
+                    </div>
+
+                    <div class="vulnerability-box" id="authentication-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>Authentication vulnerability</h2>
+                        <ul id="authenticate"></ul>
+
+                    </div>
+
+                    <div class="vulnerability-box" id="authorization-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>Authorization vulnerability</h2>
+                        <ul id="authorize"></ul>
+
+                    </div>
+
+                    <div class="vulnerability-box" id="cookies-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>Cookies vulnerability</h2>
+                        <ul id="cookies"></ul>
+
+                    </div>
+
+                    <div class="vulnerability-box" id="thirdParty-box">
+                        <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                        <h2>3rd party integration vulnerability</h2>
+                        <ul id="thirdParty"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tipforDev">
+                <div class="vulnerability-box" id="tipforDev-box">
+                    <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                    <h2>Tips for Developer</h2>
+                    <div class="tipforDev" id="tipDev"></div>
+                </div>
+
+                <div class="vulnerability-box" id="tipforUser-box">
+                    <span class="icon-container"><i class="fa-solid fa-caret-up"></i></span>
+                    <h2>Tips for User</h2>
+                    <div class="tipforUser" id="tipUser"></div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <footer>
+        <div class="contact-info">
+            <p>&copy; 2024 Our Site</p>
+        </div>
+
+    </footer>
+
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5/jquery.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        document.getElementById('main').style.display = 'none';
+        // Variable to store the interval ID for the progress animation
+        var progressInterval;
+
+        function startProgressAnimation(score) {
+            var elem = document.getElementById("myBar");
+            var width = 0;
+            var progressInterval = setInterval(frame, 10);
+
+            function frame() {
+                if (width >= score) {
+                    clearInterval(progressInterval);
+                } else {
+                    width++;
+                    elem.style.width = width + '%';
+                    document.getElementById("score").innerHTML = width + '%';
+                }
+            }
+        }
+
+        // Function to update the circular progress dynamically
+        function updateCircleProgress(percentage) {
+            $('.inside-circle').text(percentage + '%');
+        }
+
+        function myfunction() {
+            const url = document.getElementById("url").value;
+            const data = { url };
+            var tipDev = [];
+            var tipUser = [];
+            $('#loading-screen').show();
+
+            $.ajax({
+                url: "/test",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(data),
+                success: function (response) {
+                    if (response.error) {
+                        $('#result').text('Invalid url plaese try again');
+                        $('#loading-screen').hide();
+                        document.getElementById('main').style.display = 'none';
+                    } else {
+                        $('#result').text('Total Score: ' + response.total);
+                        move(response.total);
+                        // Add the "active" class to all vulnerability boxes
+                        $('.vulnerability-box').addClass('active');
+                        // Calculate percentage
+                        var percentage = response.total;
+
+                        // Update the content of the inside-circle element
+                        $('.inside-circle').text(percentage + '%');
+
+                        // Update circular progress bar
+                        updateCircleProgress(percentage);
+
+                        if (response.total >= 80) {
+                            $('.risk').text('Low Risk of Data Leakage');
+                        } else if (response.total >= 60) {
+                            $('.risk').text('Medium Low Risk of Data Leakage');
+                        } else if (response.total >= 40) {
+                            $('.risk').text('Medium Risk of Data Leakage');
+                        } else if (response.total >= 20) {
+                            $('.risk').text('Medium High Risk of Data Leakage');
+                        } else if (response.total >= 0) {
+                            $('.risk').text('High Risk of Data Leakage');
+                        }
+
+                        document.querySelector('#clickjack').innerHTML=''
+
+                        if (response.CJScore < 14) {
+                            if (!response.boolArr[0]) {
+                                $('#clickjack').append('<li>Missing Strict-Transport-Security</li>')
+                            }
+                            if (!response.boolArr[1]) {
+                                $('#clickjack').append('<li>Missing X-Content-Type-Options</li>')
+                            }
+                            if (!response.boolArr[2]) {
+                                $('#clickjack').append('<li>Missing Content-Security-Policy</li>')
+                            }
+                            if (!response.boolArr[3]) {
+                                $('#clickjack').append('<li>Missing X-Frame-Options</li>')
+                            }
+                            if (!response.boolArr[4]) {
+                                $('#clickjack').append('<li>Missing X-XSS-Protection</li>')
+                            }
+                            if (!response.boolArr[5]) {
+                                $('#clickjack').append('<li>Missing Referrer-Policy</li>')
+                            }
+                            if (!response.boolArr[6]) {
+                                $('#clickjack').append('<li>Missing Feature-policy</li>')
+                            }
+                            tipDev.push('Add on missing clickjack headers')
+                            tipUser.push('Be Cautious with Clicks, input fields or even when accessing the website')
+                        } else {
+                            $('#clickjack').append('<li>Have no clickjack vulnerability</li>')
+                        }
+
+                        document.querySelector('#sql').innerHTML=''
+
+                        if (response.sqlScore == 17) {
+                            $('#sql').append('<li>No SQL injection attack vulnerability detected</li>')
+                        } else {
+                            $('#sql').append('<li>SQL injection attack vulnerability detected</li>')
+                            tipDev.push('Use Prepared Statements and Parameterized Queries')
+                            tipDev.push('Validate and sanitize all user input to ensure that it adheres to expected formats')
+                            tipDev.push('Limit the privileges granted to database users and applications')
+                            tipDev.push('Consider using Object-Relational Mapping (ORM) frameworks')
+                            tipUser.push('Limit Exposure of Personal Information')
+                        }
+
+                        document.querySelector('#hostname').innerHTML=''
+
+                        if (response.hnScore == 9) {
+                            $('#hostname').append('<li>' + response.hostName + ' is valid hostname</li>')
+                        } else {
+                            $('#hostname').append('<li>Invalid hostname</li>')
+                            tipDev.push('Review and strengthen server configuration settings')
+                            tipUser.push('consider using a virtual private network (VPN) or other secure connection')
+                        }
+
+                        document.querySelector('#scheme').innerHTML=''
+
+                        if (response.scheme) {
+                            $('#scheme').append('<li>Secure scheme</li>')
+                        } else {
+                            $('#scheme').append('<li>Insecure scheme</li>')
+                            tipDev.push('Transition the website to HTTPS by obtaining an SSL/TLS certificate')
+                            tipUser.push('Browse website over HTTPS connections')
+                        }
+
+                        document.querySelector('#authenticate').innerHTML=''
+
+                        if (response.auth_header) {
+                            $('#authenticate').append('<li>Authentication Required</li>')
+                        } else if (response.auth_meta) {
+                            $('#authenticate').append('<li>Authentication Required</li>')
+                        } else {
+                            $('#authenticate').append('<li>No authentication required</li>')
+                            tipDev.push('Add on authentication process when login or sign up')
+                            tipUser.push('Use Strong, Unique Passwords')
+                        }
+
+                        document.querySelector('#authorize').innerHTML=''
+
+                        if (response.authorize) {
+                            $('#authorize').append('<li>Authorization Required</li>')
+                        } else {
+                            $('#authorize').append('<li>No Authorization Required</li>')
+                            tipDev.push('Provide Authorization Process whenever need to access other resources')
+                            tipUser.push('Be Wary of Phishing Attempts')
+                        }
+
+                        document.querySelector('#cookies').innerHTML=''
+
+                        if (response.cookiesNum > 0) {
+                            $('#cookies').append('<li>There are ' + response.cookiesNum + ' normal cookies detected</li>')
+                            tipDev.push('Manage Cookie Settings to reduce the risk of data leakage')
+                            tipUser.push('Consider adjusting your browser settings to control how cookies are stored and accessed')
+                        } else {
+                            $('#cookies').append('<li>No normal cookies detected</li>')
+                        }
+
+                        document.querySelector('#thirdParty').innerHTML=''
+
+                        if (response.thirdPartyCookies > 0) {
+                            $('#thirdParty').append('<li>There are ' + response.thirdPartyCookies + ' third party cookies detected</li>')
+                            tipDev.push('Manage Third Party Cookie Settings to reduce the risk of data leakage')
+                            tipUser.push('You may choose to block third-party cookies or delete cookies periodically')
+                        } else {
+                            $('#thirdParty').append('<li>No third party cookies detected</li>')
+                        }
+                        if (response.thirdPartyRequest > 0) {
+                            $('#thirdParty').append('<li>There are ' + response.thirdPartyRequest + ' requests to external domain detected</li>')
+                        } else {
+                            $('#thirdParty').append('<li>No request to external domain detected</li>')
+                        }
+
+                        tipDev.push('Conduct a Security Assessment')
+                        tipUser.push('Consider using security tools such as web security suites')
+                        tipDev.push('Monitor for Security Incidents in real-time')
+                        tipUser.push('Consider installing reputable browser extensions that offer privacy-enhancing features')
+                        tipUser.push('Avoid Providing Sensitive Information')
+
+                        displayList(tipDev, "#tipDev")
+                        displayList(tipUser, "#tipUser")
+                        $('#loading-screen').hide();
+                        $('#main').show();
+                    }
+                }
+            });
+        }
+        function move(score) {
+            var elem = document.getElementById("myBar");
+            var width = 0;
+            var id = setInterval(frame, 10);
+            function frame() {
+                if (width >= score) {
+                    clearInterval(id);
+                } else {
+                    width++;
+                    elem.style.width = width + '%';
+                    document.getElementById("score").innerHTML = width * 1 + '%';
+                }
+            }
+        }
+
+        function arrayToList(array) {
+            // Create a new unordered list element
+            const ul = document.createElement('ul');
+
+            // Loop through the array
+            array.forEach(function (item) {
+                // Create a new list item element
+                const li = document.createElement('li');
+
+                // Set the text content of the list item to the array element
+                li.textContent = item;
+
+                // Append the list item to the unordered list
+                ul.appendChild(li);
+            });
+
+            return ul;
+        }
+
+        // Function to display the list in the specified container
+        function displayList(array, containerId) {
+            // Get the list container element
+            const listContainer = document.querySelector(containerId);
+
+            // Clear existing list content
+            listContainer.innerHTML = '';
+
+            // Convert the array to a list and append it to the list container
+            listContainer.appendChild(arrayToList(array));
+        }
+
+        $(document).ready(function () {
+            $('.vulnerability-box').click(function () {
+                $(this).toggleClass('active'); // Toggle the 'active' class on click
+            });
+        });
+
+        document.querySelectorAll('.vulnerability-box').forEach(function (element) {
+            element.addEventListener('click', function () {
+                var box = this.parentElement;
+                box.classList.toggle('active');
+                // Toggle rotation of the icon
+                var iconContainer = box.querySelector('.icon-container');
+                var icon = iconContainer.querySelector('i');
+                icon.style.transform = box.classList.contains('active') ? 'rotate(-180deg)' : 'rotate(0deg)';
+            });
+        });
+
+    </script>
+
+</body>
+
+</html>
